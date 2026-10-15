@@ -425,6 +425,8 @@ const CONFIG = {
     if (S.nombre) S.nombre = limpiarNombre(S.nombre);
   }
   S.origen = leerOrigen() || S.origen || 'compartido';
+  const codigoInicial = leerCodigo() || (codigoValido(S.codigo) ? S.codigo : null);
+  if (codigoInicial) S.codigo = codigoInicial; else delete S.codigo;
   S.paso = pasoValido();
   mem.guardar();
 
@@ -434,6 +436,14 @@ const CONFIG = {
     if (!o) return null;
     o = String(o).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
     return o || null;
+  }
+  // Código del Lead Magnet (por ejemplo LM-2QY8VL) para unir en Tally las dos respuestas
+  // de la misma persona. Solo vale con el formato exacto; si No, se ignora.
+  function codigoValido(c) { return typeof c === 'string' && /^LM-[A-Z0-9]{6}$/.test(c); }
+  function leerCodigo() {
+    let c = null;
+    try { c = new URLSearchParams(window.location.search).get('codigo'); } catch (e) {}
+    return codigoValido(c) ? c : null;
   }
   function esCompartido() { return S.origen === 'compartido'; }
   // Gente que llega de fuera (Lead Magnet, Facebook...): No conoce a Óscar ni está en el grupo
@@ -693,6 +703,7 @@ const CONFIG = {
     };
     P.forEach(q => { const o = opcion(q.id); d[q.id] = o ? o.texto : ''; });
     d.origen = S.origen;
+    if (codigoValido(S.codigo)) d.codigo = S.codigo;
     return d;
   }
   function cadena(obj) { return Object.keys(obj).map(k => k + '=' + encodeURIComponent(obj[k])).join('&'); }
@@ -1122,7 +1133,10 @@ const CONFIG = {
     if (!ok) return;
     mem.borrar();
     const o = S.origen;
-    const q = o && o !== 'compartido' ? '?origen=' + encodeURIComponent(o) : '';
+    const params = [];
+    if (o && o !== 'compartido') params.push('origen=' + encodeURIComponent(o));
+    if (codigoValido(S.codigo)) params.push('codigo=' + encodeURIComponent(S.codigo));
+    const q = params.length ? '?' + params.join('&') : '';
     window.location.href = window.location.href.split('?')[0].split('#')[0] + q;
   });
 
