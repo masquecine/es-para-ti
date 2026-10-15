@@ -113,6 +113,8 @@ p{margin:0 0 14px}
 .campo:focus{outline:none;border-color:var(--rojo);box-shadow:0 0 0 3px rgba(179,34,42,.2)}
 .campo:disabled{opacity:.75}
 .error{color:var(--rojo);font-weight:700;margin:10px 0 0}
+.presentacion{font-weight:500;margin:0 0 12px}
+.presentacion + h2{margin-top:18px}
 
 /* ---------- Opciones ---------- */
 .opciones{display:flex;flex-direction:column;gap:12px;margin:22px 0 0}
@@ -274,6 +276,14 @@ const CONFIG = {
   // Número de WhatsApp para dudas y lista de espera (sin + ni espacios)
   whatsapp: "584123509235",
 
+  // Grupo de WhatsApp de la lista de espera. Lo ve quien llega de fuera (leadmagnet,
+  // facebook...) si encaja: 🟢, o 🟡 salvo los que quieren escribir o dirigir.
+  grupoWhatsApp: "https://chat.whatsapp.com/EbFfvC43evDBy7r2s2f0qj",
+
+  // Orígenes de la gente que YA está en la lista de espera: ven el test tal cual.
+  // Sin ?origen = "compartido". Cualquier otro origen = gente nueva que No conoce a Óscar.
+  origenesLista: ["oscar", "moises"],
+
   // Formulario de Tally
   tallyId: "NpKDkp",
 
@@ -309,6 +319,7 @@ const CONFIG = {
       { id: 'superficie', texto: 'La comento, pero se queda en «me ha gustado» o «No me ha gustado».', nota: 'Le pasa a casi todo el mundo. Fíjate lo que cuenta Concha:', t: 'concha1',
         carta: 'cuando terminas una peli, la conversación se queda en el «me ha gustado» o «No me ha gustado»', deseo: 'la comenta, pero se queda en «me ha gustado» o «No me ha gustado»' },
       { id: 'sincon', texto: 'No tengo con quién comentarla.', nota: 'En una encuesta del grupo, 12 de cada 15 respondieron lo mismo que tú. Por eso Más Que Cine es, antes que nada, gente.', t: 'concha2',
+        notaExterno: 'En una encuesta que hicimos, 12 de cada 15 personas respondieron lo mismo que tú. Por eso Más Que Cine es, antes que nada, gente.',
         carta: 'cuando terminas una peli, No tienes con quién comentarla', deseo: 'No tiene con quién comentarla' },
       { id: 'afondo', texto: 'La comento a fondo con amigos que saben de cine.', nota: '¡Qué suerte! Dentro vas a encontrar más gente así… y a alguien que sabe para lo que se os escape.',
         carta: 'comentas las pelis a fondo con amigos que saben de cine', deseo: 'la comenta a fondo con amigos que saben de cine' },
@@ -391,7 +402,8 @@ const CONFIG = {
   const SEM = [
     { id: 'verde',    emoji: '🟢', texto: '¡Sí, me conecto seguro!', tally: '🟢 Sí, me conecto seguro', nota: 'Geniaaal!! Te espero en primera fila.' },
     { id: 'amarillo', emoji: '🟡', texto: 'Lo intentaré',            tally: '🟡 Lo intentaré',          nota: 'Haz lo posible por venir: hay una cosa que solo cuento en directo y que No estará en la grabación.\nAhora te dejo un botón para añadirlo al calendario, así No se te pasa.' },
-    { id: 'rojo',     emoji: '🔴', texto: 'No puedo ese día',        tally: '🔴 No puedo ese día',      nota: 'Mandaremos la grabación al grupo de avisos de WhatsApp.\nPero ojo: hay una cosa que solo cuento en directo y que No estará en la grabación. Si puedes hacerle un hueco, merece la pena.' }
+    { id: 'rojo',     emoji: '🔴', texto: 'No puedo ese día',        tally: '🔴 No puedo ese día',      nota: 'Mandaremos la grabación al grupo de avisos de WhatsApp.\nPero ojo: hay una cosa que solo cuento en directo y que No estará en la grabación. Si puedes hacerle un hueco, merece la pena.',
+      notaExterno: 'Sin problema: al final te digo cómo conseguir la grabación.\nPero ojo: hay una cosa que solo cuento en directo y que No estará en la grabación. Si puedes hacerle un hueco, merece la pena.' }
   ];
 
   const ORDEN = ['nombre', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'resultado', 'semaforo', 'confirmar', 'final'];
@@ -424,6 +436,9 @@ const CONFIG = {
     return o || null;
   }
   function esCompartido() { return S.origen === 'compartido'; }
+  // Gente que llega de fuera (Lead Magnet, Facebook...): No conoce a Óscar ni está en el grupo
+  function esExterno() { return !esCompartido() && (C.origenesLista || []).indexOf(S.origen) === -1; }
+  function notaDe(o) { return esExterno() && o.notaExterno ? o.notaExterno : o.nota; }
 
   function pasoValido() {
     let max = -1;
@@ -585,6 +600,18 @@ const CONFIG = {
     return el('a', { class: 'enlace duda', href: urlDuda(), target: '_blank', rel: 'noopener' }, '💬 ¿Te queda alguna duda? Escríbenos');
   }
   function botonListaEspera() { return botonEnlace('Quiero entrar en la lista de espera', urlListaEspera(), '💬'); }
+  // Solo para quien llega de fuera: 🟢, o 🟡 salvo los que quieren escribir o dirigir
+  function puedeEntrarGrupo() {
+    if (!esExterno() || !/^https?:\/\//i.test(String(C.grupoWhatsApp || '').trim())) return false;
+    const r = calcular();
+    return !!r && (r.tipo === 'verde' || (r.tipo === 'amarillo' && r.motivos.indexOf('crear') === -1));
+  }
+  function botonGrupo() { return botonEnlace('Unirme al grupo de WhatsApp', C.grupoWhatsApp.trim(), '💬'); }
+  function botonGrabacion() {
+    const quien = S.nombre ? 'Soy ' + S.nombre + '. ' : '';
+    return botonEnlace('Pedir la grabación por WhatsApp', wa(C.whatsapp, '¡Hola, equipo de Más Que Cine! 👋 ' + quien +
+      'He hecho el test y No puedo conectarme al directo del ' + diaSemana() + '. ¿Me mandáis la grabación?'), '💬');
+  }
 
   /* ---------- Calendario ---------- */
   function horasUTC() {
@@ -796,7 +823,11 @@ const CONFIG = {
     poner(c, 
       el('span', { class: 'etiqueta' }, 'Antes de empezar'),
       el('div', { class: 'acento' }),
-      el('h2', {}, '¿Cómo te llamas?'),
+      esExterno() ? [
+        el('p', { class: 'presentacion' }, 'Me presento: soy Óscar Gómez, profesor de dirección de cine desde hace más de 10 años.'),
+        el('p', { class: 'presentacion' }, 'Con mi socio Fran Menchón, que es guionista, llevamos Más Que Cine: una comunidad para entender y disfrutar el cine.')
+      ] : null,
+      el('h2', {}, esExterno() ? 'Y tú, ¿cómo te llamas?' : '¿Cómo te llamas?'),
       el('label', { for: 'nombre', class: 'sr' }, 'Tu nombre'),
       input, err,
       el('div', { class: 'acciones' }, boton('Seguir', seguir))
@@ -836,13 +867,13 @@ const CONFIG = {
       if (bloqueado()) return;
       S.r[id] = oid;
       mem.guardar();
-      pintarOpciones(lista, q.opciones, oid, elegir, o => nota(textoNota(o.nota), o.t));
+      pintarOpciones(lista, q.opciones, oid, elegir, o => nota(textoNota(notaDe(o)), o.t));
       const sel = lista.querySelector('[aria-pressed="true"]');
       if (sel) sel.focus({ preventScroll: true });
       acciones.hidden = false;
       refrescar();
     }
-    pintarOpciones(lista, q.opciones, S.r[id], elegir, o => nota(textoNota(o.nota), o.t));
+    pintarOpciones(lista, q.opciones, S.r[id], elegir, o => nota(textoNota(notaDe(o)), o.t));
     poner(c, 
       el('span', { class: 'etiqueta' }, 'Pregunta ' + n + ' de 7'),
       id === 'p1' ? el('p', { class: 'saludo', id: 'saludo' }, saludo()) : null,
@@ -865,7 +896,9 @@ const CONFIG = {
       pars.push((o1 ? 'Y que lo que más te gustaría es ' : 'Me has dicho que lo que más te gustaría es ') + o3.carta + '.');
       pars.push('Te digo una cosa: eso es justo lo que hacemos dentro de Más Que Cine.');
       pars.push(o3.frase);
-      pars.push('El ' + dia() + ' a las ' + hora() + ' (hora de España) lo vas a ver con tus propios ojos.');
+      pars.push(esExterno()
+        ? 'El ' + dia() + ' a las ' + hora() + ' (hora de España) hago una masterclass gratis en directo y lo vas a ver con tus propios ojos.'
+        : 'El ' + dia() + ' a las ' + hora() + ' (hora de España) lo vas a ver con tus propios ojos.');
       pars.push('Analizamos juntos una escena y te enseño cosas que seguramente nunca has visto. Te va a flipar!!!');
       pars.push('Eso sí, intenta conectarte: hay una cosa que solo voy a contar en directo y que No va a estar en la grabación.');
       pars.push('Te espero en primera fila.');
@@ -939,7 +972,7 @@ const CONFIG = {
       boton('Seguir', function () { desbloquear('confirmar', true); }));
     function crearNota(o) {
       if (o.id === 'rojo' && esCompartido()) return nota('Escríbenos y te mandamos la grabación.\nPero ojo: hay una cosa que solo cuento en directo y que No estará en la grabación.', null, botonListaEspera());
-      return nota(o.nota);
+      return nota(notaDe(o));
     }
     function elegir(id) {
       if (bloqueado()) return;
@@ -990,6 +1023,8 @@ const CONFIG = {
   function pintarFinal(c) {
     const sem = S.semaforo;
     const comp = esCompartido();
+    const ext = esExterno();
+    const grupo = puedeEntrarGrupo();
     const partes = [];
     if (S.enviado) {
       partes.push(el('span', { class: 'etiqueta' }, 'Todo listo'), el('div', { class: 'acento' }),
@@ -1001,7 +1036,12 @@ const CONFIG = {
     }
     const cuerpo = el('div', { class: 'final-cuerpo' });
     if (sem === 'rojo') {
-      if (comp) { cuerpo.append(el('p', {}, 'Escríbenos y te mandamos la grabación.'), botonListaEspera()); }
+      if (ext) {
+        if (grupo) cuerpo.append(el('p', {}, 'La grabación la mandamos al grupo de WhatsApp de la lista de espera. Entra y te llega ahí:'), botonGrupo());
+        else cuerpo.append(el('p', {}, 'Escríbenos y te mandamos la grabación:'), botonGrabacion());
+        if (hayEnlace()) cuerpo.append(el('p', { class: 'aviso' }, 'Y si al final puedes conectarte, aquí tienes el directo:'), botonEnlace('Ir al directo de YouTube', C.enlaceDirecto.trim(), '▶'));
+      }
+      else if (comp) { cuerpo.append(el('p', {}, 'Escríbenos y te mandamos la grabación.'), botonListaEspera()); }
       else cuerpo.append(el('p', {}, 'Te mandaremos la grabación al grupo de avisos de WhatsApp.'));
     } else {
       cuerpo.append(el('p', {}, sem === 'verde'
@@ -1016,6 +1056,9 @@ const CONFIG = {
         el('p', { class: 'cal-nota' }, 'Se guarda solo en tu hora. No hace falta cambiar nada.'));
       if (comp) {
         cuerpo.append(el('p', { class: 'aviso' }, 'Todavía No estás en nuestro grupo de avisos, que es donde mandamos el enlace del directo:'), botonListaEspera());
+      }
+      if (grupo) {
+        cuerpo.append(el('p', { class: 'aviso' }, 'Y te invito al grupo de WhatsApp de la lista de espera: ahí aviso de todo lo que viene.'), botonGrupo());
       }
     }
     partes.push(cuerpo);
