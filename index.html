@@ -427,6 +427,16 @@ const CONFIG = {
   S.origen = leerOrigen() || S.origen || 'compartido';
   const codigoInicial = leerCodigo() || (codigoValido(S.codigo) ? S.codigo : null);
   if (codigoInicial) S.codigo = codigoInicial; else delete S.codigo;
+  // Tally copia al formulario los parámetros del enlace de la página. Si el código del
+  // enlace No es válido, se quita de la dirección para que Tally No lo guarde.
+  try {
+    const u = new URL(window.location.href);
+    const c = u.searchParams.get('codigo');
+    if (c !== null && !codigoValido(c)) {
+      u.searchParams.delete('codigo');
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    }
+  } catch (e) {}
   S.paso = pasoValido();
   mem.guardar();
 
