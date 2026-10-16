@@ -194,6 +194,9 @@ p{margin:0 0 14px}
 /* ---------- Pie ---------- */
 .pie{padding:34px var(--gutter) 40px;text-align:center}
 .pie p{margin:0 0 4px;font-weight:600}
+.pie .version{margin-top:10px;font-size:.85rem;font-weight:500;opacity:.75}
+.despues-botones{margin-top:22px;padding-bottom:26px;border-bottom:2px dashed rgba(26,18,16,.22)}
+.crema .compartir{border-top-color:rgba(26,18,16,.22)}
 
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
@@ -251,6 +254,7 @@ p{margin:0 0 14px}
 <footer class="capa crema pie">
   <p>Más Que Cine · Óscar Gómez y Fran Menchón</p>
   <button class="enlace" type="button" id="reiniciar" hidden>Empezar de nuevo</button>
+  <p class="version" id="version"></p>
 </footer>
 
 <script>
@@ -270,6 +274,10 @@ const CONFIG = {
   diferenciaUTC: 2,
   duracionMinutos: 60,
 
+  // Modo "después": cuando termina la masterclass (fecha + horaEspana + duracionMinutos,
+  // es decir, el viernes 16 a las 21:00 de España) el test esconde solo todo lo del directo.
+  // Para probarlo antes, añade ?despues al enlace (también vale junto a ?origen=...).
+
   // Enlace del directo de YouTube. Cuando exista, pégalo aquí entre las comillas.
   enlaceDirecto: "https://www.youtube.com/live/rXIP10mEfvw",
 
@@ -282,7 +290,7 @@ const CONFIG = {
 
   // Orígenes de la gente que YA está en la lista de espera: ven el test tal cual.
   // Sin ?origen = "compartido". Cualquier otro origen = gente nueva que No conoce a Óscar.
-  origenesLista: ["oscar", "moises"],
+  origenesLista: ["oscar", "moises", "lista"],
 
   // Formulario de Tally
   tallyId: "NpKDkp",
@@ -294,7 +302,10 @@ const CONFIG = {
   claveMemoria: "mqc_cualificador",
 
   // Segundos que se espera la confirmación de Tally antes de enseñar los botones finales igualmente
-  segundosPlanB: 40
+  segundosPlanB: 40,
+
+  // Versión que sale abajo del todo (para comprobar en el móvil que ya está la nueva)
+  version: "1.5"
 };
 
 (function () {
@@ -360,11 +371,13 @@ const CONFIG = {
       { id: 'menos1', texto: 'Menos de 1 hora.', nota: 'Con eso basta: No se trata de estudiar, sino de mirar distinto las pelis que ya ves.' },
       { id: 'de1a3', texto: 'De 1 a 3 horas.', nota: 'Perfecto: te da para un análisis y para pasarte por el foro de la semana.' },
       { id: 'mas3', texto: 'Más de 3 horas.', nota: 'Una pasada. Tienes más de 30 horas de cursos, análisis y debates para empezar.' },
-      { id: 'nada', texto: 'Ahora mismo, nada.', nota: 'Entonces quizá No sea tu momento, y te lo digo sin problema. La masterclass te puede servir igual.' }
+      { id: 'nada', texto: 'Ahora mismo, nada.', nota: 'Entonces quizá No sea tu momento, y te lo digo sin problema. La masterclass te puede servir igual.',
+        notaDespues: 'Entonces quizá No sea tu momento, y te lo digo sin problema. La grabación de la masterclass te puede servir igual.' }
     ]},
     { id: 'p7', titulo: '¿Qué te ha frenado hasta ahora para aprender a ver cine de otra manera?', opciones: [
       { id: 'empezar', texto: 'No sabía por dónde empezar.', nota: 'Para eso estoy yo. Dentro hay un curso pensado para empezar desde la primera escena, paso a paso.', deseo: 'No sabía por dónde empezar' },
-      { id: 'caras', texto: 'Las formaciones de cine son caras.', nota: 'Lo entiendo. El {DIA} te enseño cómo funciona todo y decides tú, con toda la información.', deseo: 'las formaciones de cine le parecen caras' },
+      { id: 'caras', texto: 'Las formaciones de cine son caras.', nota: 'Lo entiendo. El {DIA} te enseño cómo funciona todo y decides tú, con toda la información.', deseo: 'las formaciones de cine le parecen caras',
+        notaDespues: 'Lo entiendo. En la grabación de la masterclass te enseño cómo funciona todo y decides tú, con toda la información.' },
       { id: 'corte', texto: 'Me da corte comentar con desconocidos.', nota: 'Pasa mucho al principio. Aquí nadie te examina. Como dice Ana:', t: 'ana2', deseo: 'le da corte comentar con desconocidos' },
       { id: 'nada', texto: 'Nada, simplemente No me había puesto.', nota: 'Pues ya te has puesto. ¡Venga!', deseo: 'nada, simplemente No se había puesto' }
     ]}
@@ -408,6 +421,9 @@ const CONFIG = {
 
   const ORDEN = ['nombre', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'resultado', 'semaforo', 'confirmar', 'final'];
   const COLOR = { nombre: 'crema', p1: 'marron', p2: 'crema', p3: 'marron', p4: 'crema', p5: 'marron', p6: 'crema', p7: 'marron', resultado: 'crema', semaforo: 'marron', confirmar: 'crema', final: 'marron' };
+  // En modo "después" No hay semáforo: estos colores cambian para que las capas sigan alternando
+  const COLOR_DESPUES = { confirmar: 'marron', final: 'crema' };
+  function colorDe(id) { return (DESPUES && COLOR_DESPUES[id]) || COLOR[id]; }
   const ETIQUETA_BARRA = { nombre: 'Antes de empezar', resultado: 'Tu resultado', semaforo: 'La masterclass', confirmar: 'Último paso', final: '¡Hecho!' };
 
   /* ---------- Memoria del móvil ---------- */
@@ -416,6 +432,14 @@ const CONFIG = {
     guardar() { try { window.localStorage.setItem(C.claveMemoria, JSON.stringify(S)); } catch (e) { /* sin memoria: sigue igual */ } },
     borrar() { try { window.localStorage.removeItem(C.claveMemoria); } catch (e) {} }
   };
+
+  // Modo "después": desde el final de la masterclass se esconde todo lo del directo
+  // (se calcula al abrir la página). Con ?despues en el enlace se fuerza para probarlo.
+  const DESPUES = calcularDespues();
+  function calcularDespues() {
+    try { if (new URLSearchParams(window.location.search).has('despues')) return true; } catch (e) {}
+    try { return Date.now() >= horasUTC().fin.getTime(); } catch (e) { return false; }
+  }
 
   let S = { v: 1, paso: -1, nombre: '', r: {}, semaforo: null, enviado: false, planB: false, origen: null };
   const guardado = mem.leer();
@@ -458,7 +482,12 @@ const CONFIG = {
   function esCompartido() { return S.origen === 'compartido'; }
   // Gente que llega de fuera (Lead Magnet, Facebook...): No conoce a Óscar ni está en el grupo
   function esExterno() { return !esCompartido() && (C.origenesLista || []).indexOf(S.origen) === -1; }
-  function notaDe(o) { return esExterno() && o.notaExterno ? o.notaExterno : o.nota; }
+  // Para el modo "después": todo el que No está en la lista de espera (también "compartido")
+  function esDeFuera() { return (C.origenesLista || []).indexOf(S.origen) === -1; }
+  function notaDe(o) {
+    if (DESPUES && o.notaDespues) return o.notaDespues;
+    return esExterno() && o.notaExterno ? o.notaExterno : o.nota;
+  }
 
   function pasoValido() {
     let max = -1;
@@ -469,7 +498,7 @@ const CONFIG = {
         const prev = ORDEN[i - 1];
         if (prev === 'nombre' && !S.nombre) break;
         if (/^p\d$/.test(prev) && !opcion(prev)) break;
-        if (prev === 'semaforo' && !SEM.some(s => s.id === S.semaforo)) break;
+        if (prev === 'semaforo' && !DESPUES && !SEM.some(s => s.id === S.semaforo)) break;
       }
       max = i;
       if (id === 'final' && !(S.enviado || S.planB)) { max = i - 1; break; }
@@ -612,8 +641,10 @@ const CONFIG = {
     return l.href.split('?')[0].split('#')[0];
   }
   function urlCompartir() {
-    const m = 'Oye, mira esto 🎬 Es un test de 4 minutos de Más Que Cine para ver si es para ti. Y ' + cuando() +
-      ' Óscar Gómez hace una masterclass gratis en directo analizando una escena. Me he acordado de ti!';
+    const m = DESPUES
+      ? 'Oye, mira esto 🎬 Es un test de 4 minutos de Más Que Cine para ver si es para ti. Me he acordado de ti!'
+      : 'Oye, mira esto 🎬 Es un test de 4 minutos de Más Que Cine para ver si es para ti. Y ' + cuando() +
+        ' Óscar Gómez hace una masterclass gratis en directo analizando una escena. Me he acordado de ti!';
     return wa('', m + '\n' + urlLimpia());
   }
   function enlaceDuda() {
@@ -622,11 +653,29 @@ const CONFIG = {
   function botonListaEspera() { return botonEnlace('Quiero entrar en la lista de espera', urlListaEspera(), '💬'); }
   // Solo para quien llega de fuera: 🟢, o 🟡 salvo los que quieren escribir o dirigir
   function puedeEntrarGrupo() {
-    if (!esExterno() || !/^https?:\/\//i.test(String(C.grupoWhatsApp || '').trim())) return false;
+    const fuera = DESPUES ? esDeFuera() : esExterno();
+    if (!fuera || !/^https?:\/\//i.test(String(C.grupoWhatsApp || '').trim())) return false;
     const r = calcular();
     return !!r && (r.tipo === 'verde' || (r.tipo === 'amarillo' && r.motivos.indexOf('crear') === -1));
   }
   function botonGrupo() { return botonEnlace('Unirme al grupo de WhatsApp', C.grupoWhatsApp.trim(), '💬'); }
+  // Modo "después": la masterclass ya pasó y está grabada
+  function textoGrabacion() {
+    return esDeFuera()
+      ? ['La masterclass del ' + dia() + ' ya ha terminado, pero está grabada.',
+         'Si quieres verla, escríbele a Moisés, que es de mi equipo, y te la pasa por WhatsApp.']
+      : ['La masterclass del ' + dia() + ' ya ha terminado, pero está grabada: la tienes en el grupo de avisos de WhatsApp.',
+         'Échale un ojo cuando puedas, que ahí te enseño cómo es la comunidad por dentro.'];
+  }
+  function botonPedirGrabacion() {
+    return botonEnlace('📲 Pedirle la grabación a Moisés', wa(C.whatsapp, 'Hola Moisés! Soy ' + S.nombre +
+      '. Acabo de hacer el test de Más Que Cine y me gustaría ver la grabación de la masterclass 🎬'), '→');
+  }
+  function bloqueDespues() {
+    return el('div', { class: 'despues-botones' },
+      botonPedirGrabacion(),
+      puedeEntrarGrupo() ? [el('p', { class: 'aviso' }, 'Y si quieres enterarte de la próxima, entra al grupo de WhatsApp de Más Que Cine.'), botonGrupo()] : null);
+  }
   function botonGrabacion() {
     const quien = S.nombre ? 'Soy ' + S.nombre + '. ' : '';
     return botonEnlace('Pedir la grabación por WhatsApp', wa(C.whatsapp, '¡Hola, equipo de Más Que Cine! 👋 ' + quien +
@@ -708,7 +757,7 @@ const CONFIG = {
       nombre: S.nombre,
       resultado: res ? V[res.tipo].tally : '',
       perfil: res ? res.perfil.nombre : '',
-      semaforo: sem ? sem.tally : '',
+      semaforo: DESPUES ? 'despues' : (sem ? sem.tally : ''),
       deseo: deseo()
     };
     P.forEach(q => { const o = opcion(q.id); d[q.id] = o ? o.texto : ''; });
@@ -768,7 +817,7 @@ const CONFIG = {
 
   /* ---------- Secciones ---------- */
   function crearSeccion(id) {
-    const sec = el('section', { class: 'capa ' + COLOR[id] + ' pantalla aparece', id: 's-' + id, 'data-id': id },
+    const sec = el('section', { class: 'capa ' + colorDe(id) + ' pantalla aparece', id: 's-' + id, 'data-id': id },
       el('div', { class: 'contenido' }));
     document.getElementById('secciones').append(sec);
     pintar(id);
@@ -790,6 +839,7 @@ const CONFIG = {
   function desbloquear(id, desplazar) {
     const i = ORDEN.indexOf(id);
     for (let k = 0; k <= i; k++) {
+      if (DESPUES && ORDEN[k] === 'semaforo') continue;
       if (!document.getElementById('s-' + ORDEN[k])) crearSeccion(ORDEN[k]);
     }
     if (i > S.paso) { S.paso = i; mem.guardar(); }
@@ -917,12 +967,15 @@ const CONFIG = {
       pars.push((o1 ? 'Y que lo que más te gustaría es ' : 'Me has dicho que lo que más te gustaría es ') + o3.carta + '.');
       pars.push('Te digo una cosa: eso es justo lo que hacemos dentro de Más Que Cine.');
       pars.push(o3.frase);
-      pars.push(esExterno()
-        ? 'El ' + dia() + ' a las ' + hora() + ' (hora de España) hago una masterclass gratis en directo y lo vas a ver con tus propios ojos.'
-        : 'El ' + dia() + ' a las ' + hora() + ' (hora de España) lo vas a ver con tus propios ojos.');
-      pars.push('Analizamos juntos una escena y te enseño cosas que seguramente nunca has visto. Te va a flipar!!!');
-      pars.push('Eso sí, intenta conectarte: hay una cosa que solo voy a contar en directo y que No va a estar en la grabación.');
-      pars.push('Te espero en primera fila.');
+      if (DESPUES) textoGrabacion().forEach(t => pars.push(t));
+      else {
+        pars.push(esExterno()
+          ? 'El ' + dia() + ' a las ' + hora() + ' (hora de España) hago una masterclass gratis en directo y lo vas a ver con tus propios ojos.'
+          : 'El ' + dia() + ' a las ' + hora() + ' (hora de España) lo vas a ver con tus propios ojos.');
+        pars.push('Analizamos juntos una escena y te enseño cosas que seguramente nunca has visto. Te va a flipar!!!');
+        pars.push('Eso sí, intenta conectarte: hay una cosa que solo voy a contar en directo y que No va a estar en la grabación.');
+        pars.push('Te espero en primera fila.');
+      }
     } else if (res.tipo === 'amarillo') {
       hola = n + '!! Muchas gracias por contarme todo esto 🎬';
       pars.push('Te voy a ser sincero, porque prefiero eso a venderte la moto:');
@@ -941,10 +994,13 @@ const CONFIG = {
           pars.push('Dentro casi todo es en vídeo, y lo mejor es comentar las pelis con otros. Si vas por libre, te perderías la mitad.');
         }
       });
-      pars.push('Por eso te invito a la masterclass del ' + dia() + ' a las ' + hora() + ' (hora de España).');
-      pars.push('Analizo una escena en directo y te enseño Más Que Cine por dentro. Así lo ves tú y decides con toda la información.');
-      pars.push('Y si puedes, conéctate: hay una cosa que solo voy a contar en directo y que No va a estar en la grabación.');
-      pars.push('Te espero!!!');
+      if (DESPUES) textoGrabacion().forEach(t => pars.push(t));
+      else {
+        pars.push('Por eso te invito a la masterclass del ' + dia() + ' a las ' + hora() + ' (hora de España).');
+        pars.push('Analizo una escena en directo y te enseño Más Que Cine por dentro. Así lo ves tú y decides con toda la información.');
+        pars.push('Y si puedes, conéctate: hay una cosa que solo voy a contar en directo y que No va a estar en la grabación.');
+        pars.push('Te espero!!!');
+      }
     } else {
       hola = n + '!! Muchas gracias por llegar hasta el final 🎬';
       pars.push('Me has dicho que lo que más te gustaría es trabajar en el cine de forma profesional.');
@@ -953,8 +1009,10 @@ const CONFIG = {
       pars.push('Para dedicarte al cine necesitas una escuela, con prácticas y rodajes de verdad.');
       pars.push('Más Que Cine No es eso, y No te voy a decir lo contrario.');
       pars.push('Lo que sí hacemos es aprender a mirar una peli por dentro.');
-      pars.push('Si te apetece verlo, ' + cuando() + ' hago una masterclass gratis en directo y analizo una escena.');
-      pars.push('Creo que la vas a disfrutar.');
+      if (!DESPUES) {
+        pars.push('Si te apetece verlo, ' + cuando() + ' hago una masterclass gratis en directo y analizo una escena.');
+        pars.push('Creo que la vas a disfrutar.');
+      }
       pars.push('Y una cosa más: seguro que conoces a alguien a quien le encanta ver pelis, que se queda con ganas de entenderlas más a fondo o que No tiene con quién comentarlas.');
       pars.push('A esa persona Más Que Cine sí le puede encajar. Si te apetece, pásale este test con el botón de aquí abajo. Te lo agradezco un montón!!');
       pars.push('Mucha suerte con todo!!!');
@@ -981,7 +1039,8 @@ const CONFIG = {
       res.tipo === 'rojo'
         ? el('div', { class: 'compartir-carta' }, el('a', { class: 'btn-sec', href: urlCompartir(), target: '_blank', rel: 'noopener' }, '📲 Pasárselo por WhatsApp'))
         : null,
-      el('div', { class: 'acciones' }, boton('Seguir', function () { desbloquear('semaforo', true); })),
+      DESPUES && res.tipo !== 'rojo' && esDeFuera() ? bloqueDespues() : null,
+      el('div', { class: 'acciones' }, boton('Seguir', function () { desbloquear(DESPUES ? 'confirmar' : 'semaforo', true); })),
       enlaceDuda()
     );
   }
@@ -1054,6 +1113,13 @@ const CONFIG = {
       partes.push(el('span', { class: 'etiqueta' }, 'Por si acaso'), el('div', { class: 'acento' }),
         el('h2', {}, '¿Ya has pulsado «Confirmar»?'),
         el('p', { class: 'sub' }, 'Entonces ya está. Aquí tienes lo demás:'));
+    }
+    if (DESPUES) {
+      partes.push(el('div', { class: 'compartir' },
+        el('a', { class: 'btn-sec', href: urlCompartir(), target: '_blank', rel: 'noopener' }, 'Compártelo con alguien con quien ves pelis'),
+        enlaceDuda()));
+      poner(c, partes);
+      return;
     }
     const cuerpo = el('div', { class: 'final-cuerpo' });
     if (sem === 'rojo') {
@@ -1129,7 +1195,7 @@ const CONFIG = {
   btnEmpezar.addEventListener('click', function () {
     if (S.paso < 0) desbloquear('nombre', true);
     else if (S.enviado) irA('resultado');
-    else irA(ORDEN[S.paso]);
+    else irA(DESPUES && ORDEN[S.paso] === 'semaforo' ? 'resultado' : ORDEN[S.paso]);
   });
 
   document.addEventListener('click', function (e) {
@@ -1151,10 +1217,15 @@ const CONFIG = {
   });
 
   /* ---------- Arranque ---------- */
+  try {
+    const v = document.getElementById('version');
+    if (v) v.textContent = 'Versión ' + C.version;
+    if (DESPUES) { const pie = document.querySelector('footer.pie'); if (pie) { pie.classList.remove('crema'); pie.classList.add('marron'); } }
+  } catch (e) {}
   try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
   document.querySelectorAll('a.duda').forEach(a => { a.href = urlDuda(); });
   if (S.paso >= 0) {
-    for (let i = 0; i <= S.paso; i++) crearSeccion(ORDEN[i]);
+    for (let i = 0; i <= S.paso; i++) { if (!(DESPUES && ORDEN[i] === 'semaforo')) crearSeccion(ORDEN[i]); }
     if (S.paso >= ORDEN.indexOf('confirmar')) programarPlanB();
     if (S.enviado) setTimeout(function () {
       const r = document.getElementById('s-resultado');
